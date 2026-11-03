@@ -9,69 +9,107 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip libx11-6 libxcursor1 libxinerama1 libxi6 libxrandr2 libasound2t64
+          sudo apt-get install -y \
+            unzip \
+            libx11-6 \
+            libxcursor1 \
+            libxinerama1 \
+            libxi6 \
+            libxrandr2 \
+            libasound2t64
 
-      - name: Download GDRE
+      - name: Download GDRE Tools
+        shell: bash
         run: |
           mkdir -p tools output
 
-          curl -fsSL https://api.github.com/repos/GDRETools/gdsdecomp/releases/latest -o release.json
+          curl -fsSL \
+            https://api.github.com/repos/GDRETools/gdsdecomp/releases/latest \
+            -o release.json
 
           URL=$(python3 -c '
           import json
           d=json.load(open("release.json"))
           for a in d["assets"]:
-              if "linux" in a["name"].lower() and a["name"].endswith(".zip"):
+              n=a["name"].lower()
+              if "linux" in n and n.endswith(".zip"):
                   print(a["browser_download_url"])
                   break
           ')
 
-          test -n "$URL"
-          curl -fL "$URL" -o tools/gdre.zip
-          unzip -q tools/gdre.zip -d tools
-
-      - name: Locate executable
-        run: |
-          BIN=$(find tools -type f -name 'gdre_tools' -perm /111 | head -n 1)
-
-          if [ -z "$BIN" ]; then
-            BIN=$(find tools -type f -name 'GDRE_Tools' -perm /111 | head -n 1)
+          if [ -z "$URL" ]; then
+            echo "Linux release not found"
+            exit 1
           fi
 
-          if [ -z "$BIN" ]; then
+          echo "Downloading $URL"
+          curl -fL "$URL" -o tools/gdre.zip
+          unzip -oq tools/gdre.zip -d tools
+
+          echo "Downloaded files:"
+          find tools -maxdepth 2 -type f
+
+      - name: Locate GDRE executable
+        shell: bash
+        run: |
+          BIN="tools/gdre_tools.x86_64"
+
+          if [ ! -f "$BIN" ]; then
             echo "Executable not found!"
             find tools -type f
             exit 1
           fi
 
-          echo "Found executable: $BIN"
           chmod +x "$BIN"
+
+          echo "Executable information:"
+          file "$BIN"
+
           echo "GDRE_BIN=$BIN" >> "$GITHUB_ENV"
 
       - name: Check GDRE
+        shell: bash
         run: |
-          file "$GDRE_BIN"
           "$GDRE_BIN" --headless --list-bytecode-versions
 
-      - name: Decompile
+      - name: Check input files
+        shell: bash
         run: |
-          test -f CoinAdderUI.gdc
+          if [ ! -f "CoinAdderUI.gdc" ]; then
+            echo "CoinAdderUI.gdc not found in repository root!"
+            find . -type f -name "*.gdc"
+            exit 1
+          fi
+
+          ls -lh CoinAdderUI.gdc
+
+      - name: Decompile GDC
+        shell: bash
+        run: |
+          mkdir -p output
 
           "$GDRE_BIN" --headless \
-            --decompile=CoinAdderUI.gdc \
-            --output=output
+            --decompile="CoinAdderUI.gdc" \
+            --output="output"
 
+          echo "Decompile output:"
           find output -type f -print
 
-      - name: Upload result
+          if [ -z "$(find output -type f -print -quit)" ]; then
+            echo "No output files generated!"
+            exit 1
+          fi
+
+      - name: Upload Decompiled Source
         uses: actions/upload-artifact@v4
         with:
           name: CoinAdderUI-Decompiled
           path: output/
           if-no-files-found: error
+          retention-days: 7
