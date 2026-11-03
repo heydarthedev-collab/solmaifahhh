@@ -1,0 +1,64 @@
+
+name: Godot GDC Decompiler
+
+on:
+  workflow_dispatch:
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout files
+        uses: actions/checkout@v4
+
+      - name: Download GDRE Tools
+        shell: bash
+        run: |
+          mkdir -p tools output
+          curl -sL https://api.github.com/repos/GDRETools/gdsdecomp/releases/latest -o release.json
+
+          URL=$(python3 -c '
+          import json
+          d=json.load(open("release.json"))
+          for a in d["assets"]:
+              n=a["name"].lower()
+              if "linux" in n and ("x86_64" in n or "x64" in n):
+                  print(a["browser_download_url"])
+                  break
+          ')
+
+          if [ -z "$URL" ]; then
+            echo "Linux x64 release not found"
+            python3 -c 'import json; print("\n".join(a["name"] for a in json.load(open("release.json"))["assets"]))'
+            exit 1
+          fi
+
+          curl -L "$URL" -o tools/gdre.zip
+          unzip -q tools/gdre.zip -d tools
+
+      - name: Decompile GDC
+        shell: bash
+        run: |
+          BIN=$(find tools -type f -iname '*gdre*' -executable | head -n 1)
+
+          if [ -z "$BIN" ]; then
+            echo "GDRE executable not found"
+            find tools -maxdepth 3 -type f
+            exit 1
+          fi
+
+          chmod +x "$BIN"
+
+          "$BIN" --headless \
+            --decompile=CoinAdderUI.gdc \
+            --output=output
+
+          find output -type f
+
+      - name: Upload Decompiled Files
+        uses: actions/upload-artifact@v4
+        with:
+          name: Decompiled-CoinAdderUI
+          path: output/
+          if-no-files-found: error
