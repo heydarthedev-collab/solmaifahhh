@@ -1,31 +1,31 @@
 
-name: Godot GDC Decompiler
+name: Godot GDScript Decompiler
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "CoinAdderUI.gdc"
+      - ".github/workflows/blank.yml"
+
+permissions:
+  contents: read
 
 jobs:
   decompile:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            unzip \
-            libx11-6 \
-            libxcursor1 \
-            libxinerama1 \
-            libxi6 \
-            libxrandr2 \
-            libasound2t64
+          sudo apt-get install -y unzip libx11-6 libxcursor1 \
+            libxinerama1 libxi6 libxrandr2 libasound2t64
 
       - name: Download GDRE Tools
-        shell: bash
         run: |
           mkdir -p tools output
 
@@ -37,79 +37,72 @@ jobs:
           import json
           d=json.load(open("release.json"))
           for a in d["assets"]:
-              n=a["name"].lower()
-              if "linux" in n and n.endswith(".zip"):
+              if "linux" in a["name"].lower() and a["name"].endswith(".zip"):
                   print(a["browser_download_url"])
                   break
           ')
 
-          if [ -z "$URL" ]; then
-            echo "Linux release not found"
-            exit 1
-          fi
-
-          echo "Downloading $URL"
+          test -n "$URL"
           curl -fL "$URL" -o tools/gdre.zip
           unzip -oq tools/gdre.zip -d tools
 
-          echo "Downloaded files:"
-          find tools -maxdepth 2 -type f
+          chmod +x tools/gdre_tools.x86_64
 
-      - name: Locate GDRE executable
-        shell: bash
+      - name: Check bytecode versions
+        run: |
+          tools/gdre_tools.x86_64 --headless \
+            --list-bytecode-versions
+
+      - name: Decompile
         run: |
           BIN="tools/gdre_tools.x86_64"
 
-          if [ ! -f "$BIN" ]; then
-            echo "Executable not found!"
-            find tools -type f
-            exit 1
-          fi
-
-          chmod +x "$BIN"
-
-          echo "Executable information:"
-          file "$BIN"
-
-          echo "GDRE_BIN=$BIN" >> "$GITHUB_ENV"
-
-      - name: Check GDRE
-        shell: bash
-        run: |
-          "$GDRE_BIN" --headless --list-bytecode-versions
-
-      - name: Check input files
-        shell: bash
-        run: |
           if [ ! -f "CoinAdderUI.gdc" ]; then
-            echo "CoinAdderUI.gdc not found in repository root!"
-            find . -type f -name "*.gdc"
+            echo "CoinAdderUI.gdc not found!"
             exit 1
           fi
 
-          ls -lh CoinAdderUI.gdc
-
-      - name: Decompile GDC
-        shell: bash
-        run: |
           mkdir -p output
 
-          "$GDRE_BIN" --headless \
-            --decompile="CoinAdderUI.gdc" \
-            --output="output"
+          VERSIONS=(
+            "4.5.0"
+            "4.3.0"
+            "4.2.0"
+            "4.1.0"
+            "4.0.0"
+          )
 
-          echo "Decompile output:"
-          find output -type f -print
+          SUCCESS=0
 
-          if [ -z "$(find output -type f -print -quit)" ]; then
-            echo "No output files generated!"
+          for VERSION in "${VERSIONS[@]}"; do
+            echo "Trying bytecode: $VERSION"
+
+            rm -rf output/*
+            
+            if "$BIN" --headless \
+              --decompile="CoinAdderUI.gdc" \
+              --bytecode="$VERSION" \
+              --output="output"; then
+
+              if find output -type f | grep -q .; then
+                echo "Decompilation succeeded!"
+                SUCCESS=1
+                break
+              fi
+            fi
+          done
+
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "All versions failed."
             exit 1
           fi
 
-      - name: Upload Decompiled Source
+          echo "Generated files:"
+          find output -type f -print
+
+      - name: Upload Decompiled Files
         uses: actions/upload-artifact@v4
         with:
-          name: CoinAdderUI-Decompiled
+          name: Decompiled-GDScript
           path: output/
           if-no-files-found: error
-          retention-days: 7
