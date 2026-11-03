@@ -1,0 +1,80 @@
+[gd_scene load_steps=6 format=3 uid="uid://crek43chmkusr"]
+
+[ext_resource type="PackedScene" uid="uid://jqbc5awj1g5t" path="res://Scenes/ui/CustomButton.tscn" id="1_1rhjq"]
+[ext_resource type="Script" uid="uid://clis4ea4efxun" path="res://Scenes/ui/CoinAdderUI.gd" id="2_c115s"]
+[ext_resource type="Texture2D" uid="uid://cl4cgb04g3uco" path="res://Scenes/ui/assets/show.png" id="3_t67wm"]
+[ext_resource type="Texture2D" uid="uid://dc8bd580rg6kg" path="res://Scenes/ui/assets/Coin.png" id="4_eqs5e"]
+[ext_resource type="FontFile" uid="uid://djnxbn02v2032" path="res://Scenes/ui/assets/Font/Lalezar-Regular.ttf" id="5_upkvh"]
+
+[node name="CoinAdderUI" instance=ExtResource("1_1rhjq")]
+custom_minimum_size = Vector2(150, 50)
+offset_right = -1050.0
+offset_bottom = -670.0
+pivot_offset = Vector2(75, 25)
+script = ExtResource("2_c115s")
+
+[node name="BG" type="NinePatchRect" parent="." index="1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_t67wm")
+patch_margin_left = 33
+patch_margin_top = 17
+patch_margin_right = 25
+patch_margin_bottom = 21
+
+[node name="coin" type="TextureRect" parent="." index="2"]
+layout_mode = 0
+offset_left = 11.0
+offset_top = 2.0
+offset_right = 64.0
+offset_bottom = 47.0
+mouse_filter = 2
+texture = ExtResource("4_eqs5e")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="CoinLabel" type="Label" parent="." index="3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 52.0
+offset_right = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_constants/shadow_outline_size = 2
+theme_override_fonts/font = ExtResource("5_upkvh")
+theme_override_font_sizes/font_size = 25
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AddLabel" type="Label" parent="." index="4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 52.0
+offset_top = 38.0
+offset_right = -18.0
+offset_bottom = 38.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_constants/shadow_outline_size = 2
+theme_override_fonts/font = ExtResource("5_upkvh")
+theme_override_font_sizes/font_size = 25
+text = "+200"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[connection signal="pressed" from="Button" to="." method="_on__button_pressed"]
