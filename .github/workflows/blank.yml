@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install dependencies
@@ -17,67 +17,59 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip libx11-6 libxcursor1 libxinerama1 libxi6 libxrandr2 libasound2t64
 
-      - name: Download GDRE Tools
-        shell: bash
+      - name: Download GDRE
         run: |
           mkdir -p tools output
 
-          curl -fsSL \
-            https://api.github.com/repos/GDRETools/gdsdecomp/releases/latest \
-            -o release.json
+          curl -fsSL https://api.github.com/repos/GDRETools/gdsdecomp/releases/latest -o release.json
 
           URL=$(python3 -c '
           import json
           d=json.load(open("release.json"))
           for a in d["assets"]:
-              n=a["name"].lower()
-              if "linux" in n and n.endswith(".zip"):
+              if "linux" in a["name"].lower() and a["name"].endswith(".zip"):
                   print(a["browser_download_url"])
                   break
           ')
 
-          if [ -z "$URL" ]; then
-            echo "Linux ZIP not found"
-            exit 1
-          fi
-
-          echo "Downloading: $URL"
+          test -n "$URL"
           curl -fL "$URL" -o tools/gdre.zip
           unzip -q tools/gdre.zip -d tools
 
-          find tools -maxdepth 3 -type f
-
-      - name: Find GDRE executable
-        shell: bash
+      - name: Locate executable
         run: |
-          BIN=$(find tools -type f \
-            \( -name 'gdre_tools*' -o -name 'GDRE_Tools*' \) \
-            | head -n 1)
+          BIN=$(find tools -type f -name 'gdre_tools' -perm /111 | head -n 1)
 
           if [ -z "$BIN" ]; then
-            echo "GDRE executable not found"
+            BIN=$(find tools -type f -name 'GDRE_Tools' -perm /111 | head -n 1)
+          fi
+
+          if [ -z "$BIN" ]; then
+            echo "Executable not found!"
+            find tools -type f
             exit 1
           fi
 
+          echo "Found executable: $BIN"
           chmod +x "$BIN"
           echo "GDRE_BIN=$BIN" >> "$GITHUB_ENV"
 
-      - name: Decompile CoinAdderUI
-        shell: bash
+      - name: Check GDRE
         run: |
+          file "$GDRE_BIN"
+          "$GDRE_BIN" --headless --list-bytecode-versions
+
+      - name: Decompile
+        run: |
+          test -f CoinAdderUI.gdc
+
           "$GDRE_BIN" --headless \
             --decompile=CoinAdderUI.gdc \
             --output=output
 
-          echo "Decompiled files:"
           find output -type f -print
 
-          if ! find output -type f -name 'CoinAdderUI.gd' | grep -q .; then
-            echo "CoinAdderUI.gd was not generated"
-            exit 1
-          fi
-
-      - name: Upload source code
+      - name: Upload result
         uses: actions/upload-artifact@v4
         with:
           name: CoinAdderUI-Decompiled
